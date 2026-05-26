@@ -1,5 +1,6 @@
 #include <LiquidCrystal.h>
 
+// LCD pins: RS, E, D4, D5, D6, D7
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
 #define TEMP_PIN A1
@@ -19,19 +20,19 @@ void setup() {
 
 void loop() {
 
-  // Temperature 
+  // ----- Temperature -----
   int tempRaw = analogRead(TEMP_PIN);
 
   float voltage = tempRaw * (5.0 / 1023.0);
 
   float tempC = (voltage - 0.5) * 100;
 
-  // Humidity 
+  // ----- Humidity -----
   int humRaw = analogRead(HUMIDITY_PIN);
 
   int humidity = map(humRaw, 0, 1023, 0, 100);
 
-  // LCD Display
+  // ----- LCD Display -----
   lcd.setCursor(0, 0);
 
   lcd.print("T:");
