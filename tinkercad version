@@ -3,49 +3,138 @@
 // LCD pins: RS, E, D4, D5, D6, D7
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
+// Pins
 #define TEMP_PIN A1
 #define HUMIDITY_PIN A0
+#define FAN_PIN 9
 
 void setup() {
+
   lcd.begin(16, 2);
 
+  pinMode(FAN_PIN, OUTPUT);
+
+  Serial.begin(9600);
+
+  // Startup screen
   lcd.setCursor(0, 0);
-  lcd.print("Greenhouse");
+  lcd.print("Smart Greenhouse");
+
   lcd.setCursor(0, 1);
-  lcd.print("Env Monitor");
-  delay(2000);
+  lcd.print("Ventilation Sys");
+
+  delay(3000);
 
   lcd.clear();
 }
 
 void loop() {
 
-  // ----- Temperature -----
+
+  // TEMPERATURE SENSOR
+
   int tempRaw = analogRead(TEMP_PIN);
 
   float voltage = tempRaw * (5.0 / 1023.0);
 
   float tempC = (voltage - 0.5) * 100;
 
-  // ----- Humidity -----
+  // HUMIDITY SENSOR
+
   int humRaw = analogRead(HUMIDITY_PIN);
 
   int humidity = map(humRaw, 0, 1023, 0, 100);
 
-  // ----- LCD Display -----
+  // PWM FAN CONTROL
+
+  int tempSpeed = 0;
+  int humSpeed = 0;
+
+  // Fan starts at 30°C
+  if (tempC >= 30) {
+
+    tempSpeed = map(
+      tempC,
+      30, 45,
+      150, 255
+    );
+  }
+
+  // Fan starts at 70% humidity
+  if (humidity >= 70) {
+
+    humSpeed = map(
+      humidity,
+      70, 100,
+      150, 255
+    );
+  }
+
+  // Use stronger effect
+  int fanSpeed = max(tempSpeed, humSpeed);
+
+  fanSpeed = constrain(
+    fanSpeed,
+    0,
+    255
+  );
+
+  // PWM output
+  analogWrite(FAN_PIN, fanSpeed);
+
+  // STATUS CLASSIFICATION
+
+  String status = "NORMAL";
+
+  if (tempC >= 35 || humidity >= 85) {
+
+    status = "CRITICAL";
+
+  } else if (tempC >= 30 || humidity >= 70) {
+
+    status = "WARNING";
+  }
+
+  // LCD DISPLAY
+
   lcd.setCursor(0, 0);
 
   lcd.print("T:");
   lcd.print(tempC, 1);
   lcd.print((char)223);
-  lcd.print("C ");
+
+  lcd.print(" ");
 
   lcd.print("H:");
   lcd.print(humidity);
   lcd.print("% ");
 
   lcd.setCursor(0, 1);
-  lcd.print("Monitoring... ");
 
-  delay(500);
+  lcd.print(status);
+  lcd.print("        ");
+
+  // SERIAL MONITOR
+  Serial.print("Temperature: ");
+  Serial.print(tempC);
+  Serial.print(" C | ");
+
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.print("% | ");
+
+  Serial.print("Fan Speed: ");
+
+  if (fanSpeed == 0) {
+    Serial.print("0");
+  } else {
+    Serial.print(map(fanSpeed, 0, 255, 0, 100));
+  }
+
+  Serial.print("% | ");
+
+  Serial.print("Status: ");
+  Serial.println(status);
+
+  delay(1000);
 }
