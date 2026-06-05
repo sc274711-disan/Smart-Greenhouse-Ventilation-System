@@ -1,0 +1,135 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+// LCD
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// DHT
+#define DHTPIN 7
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// FAN (PWM PIN)
+#define FAN_PIN 9   // PWM OUTPUT PIN
+
+// Thresholds
+#define TEMP_THRESHOLD 30
+#define HUM_THRESHOLD 70
+
+void setup() {
+
+  lcd.init();
+  lcd.backlight();
+
+  dht.begin();
+
+  pinMode(FAN_PIN, OUTPUT);
+
+  Serial.begin(9600);
+
+  // Startup screen
+  lcd.setCursor(0, 0);
+  lcd.print("Smart Greenhouse");
+
+  lcd.setCursor(0, 1);
+  lcd.print("Ventilation Sys");
+
+  delay(3000);
+  lcd.clear();
+}
+
+void loop() {
+
+  // SENSOR READING
+
+  float tempC = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  if (isnan(tempC) || isnan(humidity)) {
+    lcd.setCursor(0, 0);
+    lcd.print("Sensor Error   ");
+    lcd.setCursor(0, 1);
+    lcd.print("Check Wiring   ");
+    delay(2000);
+    return;
+  }
+
+
+  // PWM FAN CONTROL 
+  
+  int fanSpeed = 0;
+
+  if (tempC >= TEMP_THRESHOLD || humidity >= HUM_THRESHOLD) {
+
+    float tempFactor = (tempC - TEMP_THRESHOLD) / (50.0 - TEMP_THRESHOLD);
+    float humFactor  = (humidity - HUM_THRESHOLD) / (100.0 - HUM_THRESHOLD);
+
+    float factor = max(tempFactor, humFactor);
+    factor = constrain(factor, 0.0, 1.0);
+
+    fanSpeed = factor * 255;   // PWM OUTPUT (0–255)
+  }
+  else {
+    fanSpeed = 0;
+  }
+
+  // PWM OUTPUT SECTION
+  analogWrite(FAN_PIN, fanSpeed);
+
+  // STATUS CLASSIFICATION
+
+
+  String status = "NORMAL";
+
+  if (tempC >= 35 || humidity >= 85) {
+    status = "CRITICAL";
+  }
+  else if (tempC >= TEMP_THRESHOLD || humidity >= HUM_THRESHOLD) {
+    status = "WARNING";
+  }
+
+  // LCD DISPLAY 
+
+  lcd.setCursor(0, 0);
+
+  lcd.print("T:");
+  lcd.print(tempC, 1);
+  lcd.print((char)223);
+  lcd.print("C ");
+
+  lcd.print("H:");
+  lcd.print(humidity, 0);
+  lcd.print("%");
+
+  lcd.setCursor(0, 1);
+
+  lcd.print(status);
+  lcd.print(" F:");
+
+  if (fanSpeed == 0) {
+    lcd.print("OFF   ");
+  } else {
+    lcd.print(map(fanSpeed, 0, 255, 0, 100));
+    lcd.print("%   ");
+  }
+
+  // SERIAL MONITOR OUTPUT
+
+  Serial.print("Temp: ");
+  Serial.print(tempC);
+  Serial.print(" C | Hum: ");
+  Serial.print(humidity);
+  Serial.print("% | Fan: ");
+
+  if (fanSpeed == 0) {
+    Serial.print("0");
+  } else {
+    Serial.print(map(fanSpeed, 0, 255, 0, 100));
+  }
+
+  Serial.print("% | Status: ");
+  Serial.println(status);
+
+  delay(1000);
+}
